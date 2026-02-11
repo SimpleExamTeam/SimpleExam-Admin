@@ -218,7 +218,7 @@ export function CardsEditDialog({
                     <FormItem>
                       <Select
                         disabled={isLoading}
-                        value={field.value ? field.value.toString() : "0"}
+                        value={(field.value ?? 0).toString()}
                         onValueChange={(value) => field.onChange(parseInt(value))}
                       >
                         <FormControl>
@@ -226,10 +226,10 @@ export function CardsEditDialog({
                             className="h-8 bg-background/80 border-background/20 overflow-hidden text-ellipsis whitespace-nowrap"
                             style={{ maxWidth: '100%' }}
                           >
-                            {field.value > 0 ? (
+                            {(field.value ?? 0) > 0 ? (
                               <div className="flex items-center w-full max-w-[calc(100%-8px)]">
                                 <span className="truncate flex-1 mr-2">{getSelectedCourse() ? formatCourseText(getSelectedCourse()!) : ''}</span>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">(ID:{field.value})</span>
+                                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">(ID:{field.value ?? 0})</span>
                               </div>
                             ) : (
                               <span className="truncate">全部课程</span>

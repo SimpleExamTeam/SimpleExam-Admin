@@ -501,14 +501,14 @@ export function QuestionsEditDialog({
                         <FormItem className="space-y-1">
                           <Select
                             onValueChange={(value) => field.onChange(Number(value))}
-                            value={field.value > 0 ? field.value.toString() : ""}
+                            value={(field.value ?? 0) > 0 ? (field.value ?? 0).toString() : ""}
                           >
                             <FormControl>
                               <SelectTrigger 
                                 className="h-8 bg-background/80 border-background/20 overflow-hidden text-ellipsis whitespace-nowrap"
                                 style={{ maxWidth: '100%' }}
                               >
-                                {field.value > 0 ? (
+                                {(field.value ?? 0) > 0 ? (
                                   <div className="flex items-center w-full max-w-[calc(100%-8px)]">
                                     <span className="truncate flex-1 mr-2">{getSelectedCourse() ? formatCourseText(getSelectedCourse()!) : ''}</span>
                                     <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">(ID:{field.value})</span>

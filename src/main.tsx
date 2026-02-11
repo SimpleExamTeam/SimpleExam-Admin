@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { AxiosError } from 'axios'
 import {
@@ -15,10 +16,24 @@ import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
-// 注意：这里使用动态导入确保只在开发环境中加载stagewise工具栏
-// 在实际安装stagewise包后取消注释这些代码
-import { StagewiseToolbar } from '@stagewise/toolbar-react'
-import { ReactPlugin } from '@stagewise-plugins/react'
+const DevToolbar = import.meta.env.DEV
+  ? lazy(async () => {
+      const [{ StagewiseToolbar }, { ReactPlugin }] = await Promise.all([
+        import('@stagewise/toolbar-react'),
+        import('@stagewise-plugins/react'),
+      ])
+
+      return {
+        default: () => (
+          <StagewiseToolbar
+            config={{
+              plugins: [ReactPlugin],
+            }}
+          />
+        ),
+      }
+    })
+  : null
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -97,13 +112,10 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
         <FontProvider>
-          {/* 在开发环境中加载stagewise工具栏 */}
-          {import.meta.env.DEV && (
-            <StagewiseToolbar 
-              config={{
-                plugins: [ReactPlugin]
-              }}
-            />
+          {DevToolbar && (
+            <Suspense fallback={null}>
+              <DevToolbar />
+            </Suspense>
           )}
           <RouterProvider router={router} />
         </FontProvider>
