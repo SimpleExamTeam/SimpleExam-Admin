@@ -664,7 +664,7 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
                             </FormDescription>
                             <FormControl>
                               <ExamConfigEditor 
-                                value={field.value} 
+                                value={field.value ?? []} 
                                 onChange={field.onChange}
                               />
                             </FormControl>
@@ -688,7 +688,7 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
                             </FormDescription>
                             <FormControl>
                               <MockExamConfigEditor 
-                                value={field.value} 
+                                value={field.value ?? null} 
                                 onChange={field.onChange}
                               />
                             </FormControl>
