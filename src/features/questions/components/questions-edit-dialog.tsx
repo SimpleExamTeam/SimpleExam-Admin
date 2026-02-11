@@ -501,7 +501,7 @@ export function QuestionsEditDialog({
                         <FormItem className="space-y-1">
                           <Select
                             onValueChange={(value) => field.onChange(Number(value))}
-                            value={(field.value ?? 0) > 0 ? (field.value ?? 0).toString() : ""}
+                            value={field.value > 0 ? field.value.toString() : ""}
                           >
                             <FormControl>
                               <SelectTrigger 
