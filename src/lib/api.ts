@@ -93,7 +93,7 @@ async function fetchWithAuth<T>(
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
-      };
+  }; 
 
       const response = await fetch(`${BASE_URL}${endpoint}`, {
         ...fetchOptions,
@@ -393,6 +393,7 @@ export const questionsApi = {
     type?: string;
     course_id?: number;
     category_level1?: string;
+    category_level2?: string;
   } = {}): Promise<ApiResponse> => {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
@@ -401,6 +402,7 @@ export const questionsApi = {
     if (params.question) queryParams.append('question', params.question);
     if (params.course_id) queryParams.append('course_id', params.course_id.toString());
     if (params.category_level1) queryParams.append('category_level1', params.category_level1);
+    if (params.category_level2) queryParams.append('category_level2', params.category_level2);
     if (params.question_id) queryParams.append('question_id', params.question_id.toString());
     
     const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
@@ -493,6 +495,13 @@ export const questionsApi = {
     });
     
     return response.json();
+  },
+  
+  clearByCourse: async (courseId: number): Promise<ApiResponse> => {
+    return fetchWithAuth(`/admin/questions/clear-by-course/${courseId}`, {
+      method: 'DELETE',
+      disableCache: true,
+    });
   },
 };
 
@@ -715,5 +724,23 @@ export const cardsApi = {
     
     const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
     return fetchWithAuth(`/admin/cards/${id}/records${query}`);
+  },
+};
+
+// Practice API
+export const practiceApi = {
+  generateExplanation: async (questionId: number): Promise<ApiResponse> => {
+    return fetchWithAuth(`/practice/question/${questionId}/explanation`, {
+      method: 'POST',
+      body: JSON.stringify({ force: false }),
+      disableCache: true,
+    });
+  },
+  generateExplanationWithForce: async (questionId: number): Promise<ApiResponse> => {
+    return fetchWithAuth(`/practice/question/${questionId}/explanation`, {
+      method: 'POST',
+      body: JSON.stringify({ force: true }),
+      disableCache: true,
+    });
   },
 }; 

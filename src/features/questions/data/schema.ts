@@ -26,6 +26,7 @@ export const questionSchema = z.object({
   explanation: z.string().optional().nullable(),
   course_id: z.number(),
   course_name: z.string().optional(),
+  course_category_level2: z.string().optional(),
   created_at: z.string(),
 })
 

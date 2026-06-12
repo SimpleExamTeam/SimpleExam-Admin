@@ -23,12 +23,14 @@ interface QuestionsColumnsProps {
   onView: (question: Question) => void
   onEdit: (question: Question) => void
   onDelete: (question: Question) => void
+  courses: Array<{ id: number; name: string; displayName?: string; category_level1?: string; category_level2?: string }>
 }
 
 export function createColumns({
   onView,
   onEdit,
   onDelete,
+  courses,
 }: QuestionsColumnsProps): ColumnDef<Question>[] {
   return [
     {
@@ -84,6 +86,11 @@ export function createColumns({
       ),
     },
     {
+      accessorKey: 'answer',
+      header: '答案',
+      cell: ({ row }) => <div className="font-mono text-sm">{row.getValue('answer')}</div>,
+    },
+    {
       accessorKey: 'type',
       header: '题目类型',
       cell: ({ row }) => {
@@ -101,7 +108,13 @@ export function createColumns({
     {
       accessorKey: 'course_name',
       header: '所属课程',
-      cell: ({ row }) => <div>{row.getValue('course_name')}</div>,
+      cell: ({ row }) => {
+        const courseName = row.original.course_name || '';
+        const courseId = row.original.course_id;
+        const course = courses.find(c => c.id === courseId);
+        const displayName = course?.category_level2 ? `${course.category_level2}-${courseName}` : courseName;
+        return <div>{displayName}</div>;
+      },
     },
     {
       accessorKey: 'created_at',

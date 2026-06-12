@@ -15,8 +15,8 @@ import { Question, QuestionType } from '../data/schema'
 import { formatDate, cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { IconCalendar, IconId, IconList, IconSchool, IconFileDescription, IconTrash, IconAlertCircle, IconPencil } from '@tabler/icons-react'
-import { questionsApi } from '@/lib/api'
+import { IconCalendar, IconId, IconList, IconSchool, IconFileDescription, IconTrash, IconAlertCircle, IconPencil, IconWand } from '@tabler/icons-react'
+import { questionsApi, practiceApi } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
 import {
   AlertDialog,
@@ -42,6 +42,7 @@ interface QuestionsViewDialogProps {
   currentRow: Question
   onSuccess?: () => void
   onEdit?: (question: Question) => void
+  courses: Array<{ id: number; name: string; displayName?: string; category_level1?: string; category_level2?: string }>
 }
 
 export function QuestionsViewDialog({
@@ -49,10 +50,12 @@ export function QuestionsViewDialog({
   onOpenChange,
   currentRow,
   onSuccess,
-  onEdit
+  onEdit,
+  courses
 }: QuestionsViewDialogProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isGeneratingExplanation, setIsGeneratingExplanation] = useState(false)
   const { toast } = useToast()
   const type = currentRow.type as QuestionType
   const typeInfo = questionTypeMap[type] || { label: type, color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', variant: 'default' }
@@ -101,6 +104,43 @@ export function QuestionsViewDialog({
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // 处理生成解析说明
+  const handleGenerateExplanation = async () => {
+    setIsGeneratingExplanation(true);
+    
+    try {
+      // 如果已有解析，传递 force: true 以覆盖
+      const response = currentRow.explanation 
+        ? await practiceApi.generateExplanationWithForce(currentRow.id)
+        : await practiceApi.generateExplanation(currentRow.id);
+      
+      if (response.code === 200 && response.data?.explanation) {
+        toast({
+          title: currentRow.explanation ? "解析重新生成成功" : "解析生成成功",
+          description: currentRow.explanation ? "题目解析已成功重新生成" : "题目解析已成功生成",
+        });
+        // 更新当前行的解析说明
+        currentRow.explanation = response.data.explanation;
+        if (onSuccess) onSuccess();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "生成失败",
+          description: response.msg || "生成解析说明失败，请重试",
+        });
+      }
+    } catch (error) {
+      console.error('生成解析说明失败:', error);
+      toast({
+        variant: "destructive",
+        title: "生成失败",
+        description: "生成解析说明失败，请重试",
+      });
+    } finally {
+      setIsGeneratingExplanation(false);
     }
   };
 
@@ -171,9 +211,21 @@ export function QuestionsViewDialog({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3 p-3 rounded-lg bg-background/60 backdrop-blur-sm border border-background/10 shadow-sm">
-                  <h4 className="text-xs font-medium text-muted-foreground/90 uppercase flex items-center gap-1">
-                    <IconFileDescription className="h-3.5 w-3.5" /> 解析说明
-                  </h4>
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-medium text-muted-foreground/90 uppercase flex items-center gap-1">
+                      <IconFileDescription className="h-3.5 w-3.5" /> 解析说明
+                    </h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateExplanation}
+                      disabled={isGeneratingExplanation}
+                      className="h-6 text-xs"
+                    >
+                      <IconWand className="h-3.5 w-3.5 mr-1" />
+                      {isGeneratingExplanation ? '生成中...' : (currentRow.explanation ? '重新生成解析' : '生成解析')}
+                    </Button>
+                  </div>
                   {currentRow.explanation ? (
                     <p className="text-sm">{currentRow.explanation}</p>
                   ) : (
@@ -181,21 +233,24 @@ export function QuestionsViewDialog({
                   )}
                 </div>
                 
-                <div className="space-y-3 p-3 rounded-lg bg-background/60 backdrop-blur-sm border border-background/10 shadow-sm">
-                  <h4 className="text-xs font-medium text-muted-foreground/90 uppercase flex items-center gap-1">
-                    <IconSchool className="h-3.5 w-3.5" /> 所属课程
-                  </h4>
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground/90">课程名称</p>
-                      <p className="text-sm font-medium">{currentRow.course_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground/90">课程ID</p>
-                      <p className="text-sm font-medium">{currentRow.course_id}</p>
+                  <div className="space-y-3 p-3 rounded-lg bg-background/60 backdrop-blur-sm border border-background/10 shadow-sm">
+                    <h4 className="text-xs font-medium text-muted-foreground/90 uppercase flex items-center gap-1">
+                      <IconSchool className="h-3.5 w-3.5" /> 所属课程
+                    </h4>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">课程名称</p>
+                        <p className="text-sm font-medium">{(() => {
+                          const course = courses.find(c => c.id === currentRow.course_id);
+                          return course?.category_level2 ? `${course.category_level2}-${currentRow.course_name}` : currentRow.course_name;
+                        })()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">课程ID</p>
+                        <p className="text-sm font-medium">{currentRow.course_id}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
               </div>
               
               <div className="space-y-3 p-3 rounded-lg bg-background/60 backdrop-blur-sm border border-background/10 shadow-sm">

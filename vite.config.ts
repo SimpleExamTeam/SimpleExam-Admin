@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       strictPort: true, // 如果端口被占用，则会抛出错误而不是尝试下一个可用端口
-      allowedHosts: ['localhost', 'dev.imwlw.com', 'sc.itsharestudio.cn'], // 允许的主机列表
+      allowedHosts: true, // 允许所有主机
     },
     build: {
       // 禁用代码分割

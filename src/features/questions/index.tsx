@@ -6,7 +6,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { createColumns } from './components/questions-columns'
 import { QuestionsTable } from './components/questions-table'
 import { Button } from '@/components/ui/button'
-import { IconPlus, IconRefresh, IconFileExport, IconFileUpload, IconTrash } from '@tabler/icons-react'
+import { IconPlus, IconRefresh, IconFileExport, IconFileUpload, IconTrash, IconX } from '@tabler/icons-react'
 import { Question, QuestionList, questionListSchema } from './data/schema'
 import { questionsApi, coursesApi, useDeduplicatedEffect } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
@@ -42,6 +42,7 @@ interface QuestionSearchParams {
   type?: string;
   course_id?: number;
   category_level1?: string;
+  category_level2?: string;
   page?: number;
   size?: number;
 }
@@ -55,6 +56,7 @@ export default function Questions() {
   })
   const [questionType, setQuestionType] = useState('')
   const [categoryLevel1, setCategoryLevel1] = useState<string>('')
+  const [categoryLevel2, setCategoryLevel2] = useState<string>('')
   const [categoryList, setCategoryList] = useState<string[]>([])
   const [courseId, setCourseId] = useState<number | undefined>(undefined)
   const [currentPage, setCurrentPage] = useState(1)
@@ -64,13 +66,15 @@ export default function Questions() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null)
   const [isDeleteLoading, setIsDeleteLoading] = useState(false)
-  const [courses, setCourses] = useState<Array<{ id: number; name: string }>>([])
+  const [courses, setCourses] = useState<Array<{ id: number; name: string; displayName?: string; category_level1?: string; category_level2?: string }>>([])
   const { toast } = useToast()
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [questionToEdit, setQuestionToEdit] = useState<Question | null>(null)
   const [selectedRows, setSelectedRows] = useState<Question[]>([])
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false)
   const [isBatchDeleteLoading, setIsBatchDeleteLoading] = useState(false)
+  const [isClearByCourseDialogOpen, setIsClearByCourseDialogOpen] = useState(false)
+  const [isClearingByCourse, setIsClearingByCourse] = useState(false)
   const resetSelectionRef = useRef<() => void>(null)
   
   // 监听来自其他页面的题目ID搜索请求
@@ -159,6 +163,10 @@ export default function Questions() {
           requestParams.category_level1 = params.category_level1;
         }
         
+        if (params.category_level2) {
+          requestParams.category_level2 = params.category_level2;
+        }
+        
         console.log('题库请求参数:', requestParams);
         
         const response = await questionsApi.getQuestions(requestParams)
@@ -199,6 +207,7 @@ export default function Questions() {
     }
   }
 
+  // 生成格式化的课程显示名称
   // 获取课程列表（用于过滤）
   const fetchCourses = async () => {
     try {
@@ -209,7 +218,10 @@ export default function Questions() {
       if (response.code === 200 && response.data?.items) {
         const courseOptions = response.data.items.map((course: any) => ({
           id: course.id,
-          name: course.category_level2 + ' - ' + course.name,
+          name: course.name,
+          displayName: course.category_level2 ? `${course.category_level2} - ${course.name}` : course.name,
+          category_level1: course.category_level1,
+          category_level2: course.category_level2,
         }))
         setCourses(courseOptions)
         
@@ -292,10 +304,23 @@ export default function Questions() {
     const newCategory = category === "all" ? "" : category;
     if (newCategory !== categoryLevel1) {
       setCategoryLevel1(newCategory);
+      setCategoryLevel2(''); // 重置二级分类
       setCurrentPage(1); // 筛选时重置到第一页
       
       // 更新搜索参数
       const newParams = { ...searchParams, category_level1: newCategory, page: 1 };
+      setSearchParams(newParams);
+    }
+  }
+
+  // 二级分类筛选处理
+  const handleCategoryLevel2Filter = (category: string) => {
+    const newCategory = category === "all" ? "" : category;
+    if (newCategory !== categoryLevel2) {
+      setCategoryLevel2(newCategory);
+      setCurrentPage(1);
+      
+      const newParams = { ...searchParams, category_level2: newCategory || undefined, page: 1 };
       setSearchParams(newParams);
     }
   }
@@ -399,7 +424,7 @@ export default function Questions() {
       if (targetCourseId) {
         const selectedCourse = courses.find(c => c.id === targetCourseId);
         if (selectedCourse) {
-          fileName += `_${selectedCourse.name}`;
+          fileName += `_${selectedCourse.displayName || selectedCourse.name}`;
         }
       }
       fileName += '.csv';
@@ -577,6 +602,7 @@ export default function Questions() {
     // 重置筛选条件
     setQuestionType('');
     setCategoryLevel1('');
+    setCategoryLevel2('');
     setCourseId(undefined);
     
     // 重置页码
@@ -591,11 +617,63 @@ export default function Questions() {
     fetchQuestions(newParams);
   }
 
+  // 处理清空指定课程题目
+  const handleClearByCourse = () => {
+    if (!courseId) {
+      toast({
+        variant: "destructive",
+        title: "请先选择课程",
+        description: "请先选择要清空题目的课程",
+      });
+      return;
+    }
+    setIsClearByCourseDialogOpen(true);
+  }
+
+  // 确认清空指定课程题目
+  const handleConfirmClearByCourse = async () => {
+    if (!courseId) return;
+
+    setIsClearingByCourse(true);
+    try {
+      const response = await questionsApi.clearByCourse(courseId);
+      if (response.code === 200) {
+        toast({
+          title: "清空成功",
+          description: response.msg || "该课程的题目已清空",
+        });
+        setIsClearByCourseDialogOpen(false);
+        setCategoryLevel1('');
+        setCategoryLevel2('');
+        setCourseId(undefined);
+        setSearchParams({ page: 1, size: pageSize });
+        setCurrentPage(1);
+        fetchQuestions();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "清空失败",
+          description: response.msg || "清空题目时出现错误",
+        });
+      }
+    } catch (error) {
+      console.error('清空课程题目失败:', error);
+      toast({
+        variant: "destructive",
+        title: "清空失败",
+        description: "清空课程题目时出现错误",
+      });
+    } finally {
+      setIsClearingByCourse(false);
+    }
+  }
+
   // 创建列定义，传入动作处理函数
   const columns = createColumns({
     onView: handleViewQuestion,
     onEdit: handleEditQuestion,
     onDelete: handleDeleteQuestion,
+    courses,
   })
 
   return (
@@ -653,6 +731,28 @@ export default function Questions() {
           </Select>
 
           <Select
+            onValueChange={handleCategoryLevel2Filter}
+            defaultValue="all"
+            value={categoryLevel2 || "all"}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="选择二级分类" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部分类</SelectItem>
+              {courses
+                .filter(course => (!categoryLevel1 || course.category_level1 === categoryLevel1) && course.category_level2)
+                .map(course => course.category_level2!)
+                .filter((value, index, self) => self.indexOf(value) === index)
+                .map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+
+          <Select
             onValueChange={handleCourseFilter}
             defaultValue="0"
             value={courseId ? courseId.toString() : "0"}
@@ -662,9 +762,15 @@ export default function Questions() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0">全部课程</SelectItem>
-              {courses.map((course) => (
+              {courses
+                .filter(course => {
+                  if (categoryLevel1 && course.category_level1 !== categoryLevel1) return false;
+                  if (categoryLevel2 && course.category_level2 !== categoryLevel2) return false;
+                  return true;
+                })
+                .map((course) => (
                 <SelectItem key={course.id} value={course.id.toString()}>
-                  {course.name}
+                  {course.displayName || course.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -694,6 +800,15 @@ export default function Questions() {
             <Button variant="outline" onClick={handleImport} className="flex items-center">
               <IconFileUpload className="mr-2 h-4 w-4" />
               导入题库
+            </Button>
+            
+            <Button 
+              variant="destructive" 
+              className="flex items-center"
+              onClick={handleClearByCourse}
+            >
+              <IconX className="mr-2 h-4 w-4" />
+              清空题库
             </Button>
           </div>
         </div>
@@ -735,6 +850,7 @@ export default function Questions() {
           currentRow={selectedQuestion}
           onSuccess={fetchQuestions}
           onEdit={handleEditQuestion}
+          courses={courses}
         />
       )}
 
@@ -773,6 +889,49 @@ export default function Questions() {
         selectedRows={selectedRows}
         onConfirm={handleConfirmBatchDelete}
         isLoading={isBatchDeleteLoading}
+      />
+      
+      {/* 清空课程题目确认对话框 */}
+      <ConfirmDeleteDialog
+        open={isClearByCourseDialogOpen}
+        onOpenChange={setIsClearByCourseDialogOpen}
+        title="确认清空课程题目"
+        description={
+          <>
+            您确定要清空选定课程的全部题目吗？此操作不可逆。
+            <div className="mt-2 p-2 bg-muted rounded-md">
+              {courseId && (() => {
+                const selectedCourse = courses.find(c => c.id === courseId);
+                return selectedCourse ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">课程ID</p>
+                        <p className="text-sm font-medium">{selectedCourse.id}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">课程名称</p>
+                        <p className="text-sm font-medium">{selectedCourse.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">一级分类</p>
+                        <p className="text-sm font-medium">{selectedCourse.category_level1 || '未分类'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground/90">二级分类</p>
+                        <p className="text-sm font-medium">{selectedCourse.category_level2 || '未分类'}</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm">课程信息加载中...</p>
+                );
+              })()}
+            </div>
+          </>
+        }
+        onConfirm={handleConfirmClearByCourse}
+        isLoading={isClearingByCourse}
       />
     </>
   )
